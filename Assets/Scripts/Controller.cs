@@ -68,6 +68,22 @@ public class Controller : MonoBehaviour
     List<float> angles = new List<float>(); //TODO: FIND BETTER;
     void Update()
     {
+        var cam = Camera.main;
+        var vert = cam.orthographicSize;//Camera.main.orthographicSize;
+        var horz =  2 *(vert * Screen.width / Screen.height);
+        var camPos = Camera.main.transform.position;
+        var northeast = new Vector3(camPos.x + vert, camPos.y + horz, 0);
+        var southeast = new Vector3(camPos.x + vert, camPos.y - horz, 0);
+        var southwest = new Vector3(camPos.x - vert, camPos.y - horz, 0);
+        var northwest = new Vector3(camPos.x - vert, camPos.y + horz, 0);
+        AllPoints[AllPoints.Length - 4] = northeast;
+        AllPoints[AllPoints.Length - 3] = southeast;
+        AllPoints[AllPoints.Length - 2] = southwest;
+        AllPoints[AllPoints.Length - 1] = northwest;
+        Segments[Segments.Length - 4] = new Segment { a = northeast, b = southeast };
+        Segments[Segments.Length - 3] = new Segment { a = southeast, b = southwest };
+        Segments[Segments.Length - 2] = new Segment { a = southwest, b = northwest };
+        Segments[Segments.Length - 1] = new Segment { a = northwest, b = northeast };
 
         if (Input.GetKey(KeyCode.W))
         {
@@ -226,14 +242,14 @@ public class Controller : MonoBehaviour
         var vert = cam.orthographicSize;//Camera.main.orthographicSize;
         var horz = vert * Screen.width / Screen.height;
         var camPos = Camera.main.transform.position;
-        var northeast =  new Vector3(camPos.x + vert, camPos.y + horz, 0);
+        var northeast = new Vector3(camPos.x + vert, camPos.y + horz, 0);
         var southeast = new Vector3(camPos.x + vert, camPos.y - horz, 0);
         var southwest = new Vector3(camPos.x - vert, camPos.y - horz, 0);
         var northwest = new Vector3(camPos.x - vert, camPos.y + horz, 0);
         retval.Add(new Segment { a = northeast, b = southeast });
-        retval.Add( new Segment { a = southeast, b = southwest });
-        retval.Add( new Segment { a = southwest, b = northwest });
-        retval.Add( new Segment { a = northwest, b = northeast });
+        retval.Add(new Segment { a = southeast, b = southwest });
+        retval.Add(new Segment { a = southwest, b = northwest });
+        retval.Add(new Segment { a = northwest, b = northeast });
         return retval.ToArray();
     }
     public struct Segment
