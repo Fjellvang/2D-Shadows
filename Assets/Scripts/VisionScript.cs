@@ -8,9 +8,9 @@ using UnityEngine;
 /// 
 /// needs heavy refactoring
 /// </summary>
-public class Controller : MonoBehaviour
+public class VisionScript : MonoBehaviour
 {
-    Transform transform;
+    //Transform transform;
     [SerializeField]
     float speed = 10;
     public float radius = 5f;
@@ -19,6 +19,7 @@ public class Controller : MonoBehaviour
 
     public Material mat;
     MeshRenderer renderer;
+    MeshCollider meshCollider;
 
 
     Segment[] Segments;
@@ -31,7 +32,8 @@ public class Controller : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        transform = GetComponent<Transform>();
+        //transform = GetComponent<Transform>();
+        meshCollider = GetComponent<MeshCollider>();
         Segments = FindAllLines();
         //TODO: Optimize this;
         var points = new List<Vector2>();
@@ -69,8 +71,8 @@ public class Controller : MonoBehaviour
     void Update()
     {
         var cam = Camera.main;
-        var vert = cam.orthographicSize;//Camera.main.orthographicSize;
-        var horz =  2 *(vert * Screen.width / Screen.height);
+        var vert = 2*cam.orthographicSize;//Camera.main.orthographicSize;
+        var horz =  (vert * Screen.width / Screen.height);
         var camPos = Camera.main.transform.position;
         var northeast = new Vector3(camPos.x + vert, camPos.y + horz, 0);
         var southeast = new Vector3(camPos.x + vert, camPos.y - horz, 0);
@@ -85,22 +87,6 @@ public class Controller : MonoBehaviour
         Segments[Segments.Length - 2] = new Segment { a = southwest, b = northwest };
         Segments[Segments.Length - 1] = new Segment { a = northwest, b = northeast };
 
-        if (Input.GetKey(KeyCode.W))
-        {
-            transform.position += Vector3.up * speed * Time.deltaTime;
-        }
-        if (Input.GetKey(KeyCode.D))
-        {
-            transform.position += Vector3.right * speed * Time.deltaTime;
-        }
-        if (Input.GetKey(KeyCode.S))
-        {
-            transform.position += Vector3.up * -speed * Time.deltaTime;
-        }
-        if (Input.GetKey(KeyCode.A))
-        {
-            transform.position += Vector3.right * -speed * Time.deltaTime;
-        }
         var Watch = System.Diagnostics.Stopwatch.StartNew();
         NumberOfCalculations++;
 
@@ -153,11 +139,12 @@ public class Controller : MonoBehaviour
         mesh.RecalculateBounds();
         mesh.RecalculateNormals();
 
+        meshCollider.sharedMesh = mesh;
         MeshFilter.mesh = mesh;
 
         Watch.Stop();
         Sum += Watch.Elapsed.TotalMilliseconds;
-        Debug.Log($"ELAPSED: {Watch.Elapsed}, Average: {Sum / NumberOfCalculations}");
+        //Debug.Log($"ELAPSED: {Watch.Elapsed}, Average: {Sum / NumberOfCalculations}");
     }
 
     private List<PointAndAngle> FinderIntersections(List<float> angles, Vector3 origPos)
