@@ -53,8 +53,10 @@ public class VisionScript : MonoBehaviour
     private void Awake()
     {
         MeshFilter = GetComponentInChildren<MeshFilter>();
-        renderer = GetComponentInChildren<MeshRenderer>();
+        renderer = GetComponent<MeshRenderer>();
+        renderer.enabled = true;
         renderer.material = mat;
+        renderer.material.renderQueue = 1800;
     }
 
     //private void OnDrawGizmos()
@@ -115,8 +117,8 @@ public class VisionScript : MonoBehaviour
         {
             var point = PointAndAngles[i];
             var point2 = PointAndAngles[i + 1];
-            vertices.Add(transform.InverseTransformPoint(point.x, point.y,0));
-            vertices.Add(transform.InverseTransformPoint(point2.x, point2.y,0));
+            vertices.Add(transform.InverseTransformPoint(point.x, point.y,transform.position.z));
+            vertices.Add(transform.InverseTransformPoint(point2.x, point2.y,transform.position.z));
         }
         vertices.Add(transform.InverseTransformPoint(PointAndAngles[PointAndAngles.Count-1].x, PointAndAngles[PointAndAngles.Count -1].y,0));
         vertices.Add(transform.InverseTransformPoint(PointAndAngles[0].x, PointAndAngles[0].y,0));
@@ -136,10 +138,11 @@ public class VisionScript : MonoBehaviour
             triangles = triangles.ToArray(),
 
         };
-        mesh.RecalculateBounds();
+        //mesh.RecalculateBounds();
         mesh.RecalculateNormals();
+        //mesh.RecalculateTangents();
 
-        meshCollider.sharedMesh = mesh;
+        //meshCollider.sharedMesh = mesh;
         MeshFilter.mesh = mesh;
 
         Watch.Stop();

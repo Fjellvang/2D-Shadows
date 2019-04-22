@@ -1,6 +1,4 @@
-﻿// Upgrade NOTE: replaced '_Object2World' with 'unity_ObjectToWorld'
-
-Shader "Unlit/MyFifthShader"
+﻿Shader "Unlit/SpriteStencil"
 {
     Properties
     {
@@ -8,26 +6,21 @@ Shader "Unlit/MyFifthShader"
     }
     SubShader
     {
-        Tags { "RenderType"="Opaque" "Queue"="Geometry-100"} // Geometry - 100 so it renders first
-		//ColorMask 0
-		ZWrite Off // Ensures that objects behind the mask will be rendered
-		//Cull off
+        Tags { "RenderType"="Opaque" }
         LOD 100
+		Cull Off
+		Blend One OneMinusSrcAlpha
 
-		Stencil
-		{
-			Ref 1 // Value will be 1
-			Comp always // Is it needed ?
-			Pass replace
+		Stencil{
+			Ref 1
+			Comp equal
 		}
         Pass
         {
-			ZTest less
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
             // make fog work
-            #pragma multi_compile_fog
 
             #include "UnityCG.cginc"
 
@@ -40,10 +33,7 @@ Shader "Unlit/MyFifthShader"
             struct v2f
             {
                 float2 uv : TEXCOORD0;
-                UNITY_FOG_COORDS(1)
                 float4 vertex : SV_POSITION;
-				float4 screenPos : TEXCOORD1;
-				float4 objectOrigin : TEXCOORD2;
             };
 
             sampler2D _MainTex;
@@ -54,9 +44,6 @@ Shader "Unlit/MyFifthShader"
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
-				o.screenPos = ComputeScreenPos(o.vertex);
-				o.objectOrigin = mul(unity_ObjectToWorld, float4(0,0,0,0));
-                UNITY_TRANSFER_FOG(o,o.vertex);
                 return o;
             }
 
@@ -64,12 +51,8 @@ Shader "Unlit/MyFifthShader"
             {
                 // sample the texture
                 fixed4 col = tex2D(_MainTex, i.uv);
+				col.rgb *= col.a;
                 // apply fog
-				float4 test = _ScreenParams;
-				float x = distance(float4(_ScreenParams.x/2,_ScreenParams.y/2,0,0), i.vertex)/500;
-				col = float4(1-x,1-x,1-x,x);
-				float4 a = i.screenPos;
-                UNITY_APPLY_FOG(i.fogCoord, col);
                 return col;
             }
             ENDCG
