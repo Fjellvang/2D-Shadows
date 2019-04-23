@@ -213,16 +213,17 @@ public class VisionScript : MonoBehaviour
 
     public Segment[] FindAllLines()
     {
-        var allwalls = GameObject.FindGameObjectsWithTag("wall").Select(x=> x.GetComponent<BoxCollider2D>()).ToArray();
+        var allwalls = GameObject.FindGameObjectsWithTag("wall").ToArray();
         List<Segment> retval = new List<Segment>();
-        foreach (var collider in allwalls)
+        foreach (var gameObject in allwalls)
         {
-            var center = collider.bounds.center;
-            var extents = collider.bounds.extents;
-            var NorthEast = center + extents;
-            var SouthEast = center + new Vector3(extents.x, -extents.y);
-            var SouthWest = center + new Vector3(-extents.x, -extents.y);
-            var NorthWest = center + new Vector3(-extents.x, extents.y);
+            var collider = gameObject.GetComponent<BoxCollider2D>();
+            var center = collider.offset;
+            var extents = collider.size;
+            var NorthEast = gameObject.transform.TransformPoint(center + new Vector2(extents.x, extents.y) * 0.5f);
+            var SouthEast = gameObject.transform.TransformPoint(center + (new Vector2(extents.x, -extents.y) * 0.5f));///center + new Vector3(extents.x, -extents.y);
+            var SouthWest = gameObject.transform.TransformPoint(center + (new Vector2(-extents.x, -extents.y) * 0.5f)); //center + new Vector3(-extents.x, -extents.y);
+            var NorthWest = gameObject.transform.TransformPoint(center + (new Vector2(-extents.x, extents.y) * 0.5f));// center + new Vector3(-extents.x, extents.y);
             retval.Add(new Segment { a = NorthEast, b = SouthEast });
             retval.Add(new Segment { a = SouthEast, b = SouthWest });
             retval.Add( new Segment { a = SouthWest, b = NorthWest });
