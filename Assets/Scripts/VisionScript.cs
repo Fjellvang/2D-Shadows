@@ -13,7 +13,7 @@ public class VisionScript : MonoBehaviour
     //Transform transform;
     [SerializeField]
     float speed = 10;
-    public float radius = 5f;
+    public float radius = 0f;
 
     public LayerMask mask;
 
@@ -165,7 +165,13 @@ public class VisionScript : MonoBehaviour
             //Debug.DrawRay(transform.position, new Vector3(raydeltax, raydeltay), Color.yellow);
             for (int j = 0; j < Segments.Length; j++)
             {
+                //TODO: Skip cases where ray and segment are parallel
                 var segmentDelta = Segments[j].b - Segments[j].a;
+                //if (Mathf.Abs((raydeltax * segmentDelta.y) - (raydeltay * segmentDelta.x)) <= 0.001f)
+                //{
+                //    //are they parralel?https://github.com/legends2k/2d-fov/blob/gh-pages/index.html#L479
+                //    continue;
+                //}
                 if (Mathf.Abs(segmentDelta.x - raydeltax) > 0 && Mathf.Abs(segmentDelta.y - raydeltay) > 0)
                 {
                     var seg = Segments[j];
@@ -215,6 +221,7 @@ public class VisionScript : MonoBehaviour
     {
         var allwalls = GameObject.FindGameObjectsWithTag("wall").ToArray();
         List<Segment> retval = new List<Segment>();
+        List<PointWithSegments> PointsWithSegments = new List<PointWithSegments>();
         foreach (var gameObject in allwalls)
         {
             var collider = gameObject.GetComponent<BoxCollider2D>();
@@ -224,10 +231,11 @@ public class VisionScript : MonoBehaviour
             var SouthEast = gameObject.transform.TransformPoint(center + (new Vector2(extents.x, -extents.y) * 0.5f));///center + new Vector3(extents.x, -extents.y);
             var SouthWest = gameObject.transform.TransformPoint(center + (new Vector2(-extents.x, -extents.y) * 0.5f)); //center + new Vector3(-extents.x, -extents.y);
             var NorthWest = gameObject.transform.TransformPoint(center + (new Vector2(-extents.x, extents.y) * 0.5f));// center + new Vector3(-extents.x, extents.y);
+            PointsWithSegments.Add(new PointWithSegments(NorthEast, new Segment { a = }))
             retval.Add(new Segment { a = NorthEast, b = SouthEast });
             retval.Add(new Segment { a = SouthEast, b = SouthWest });
-            retval.Add( new Segment { a = SouthWest, b = NorthWest });
-            retval.Add( new Segment { a = NorthWest, b = NorthEast });
+            retval.Add(new Segment { a = SouthWest, b = NorthWest });
+            retval.Add(new Segment { a = NorthWest, b = NorthEast });
         }
         var cam = Camera.main;
         var vert = cam.orthographicSize;//Camera.main.orthographicSize;
@@ -247,6 +255,18 @@ public class VisionScript : MonoBehaviour
     {
         public Vector2 a;
         public Vector2 b;
+    }
+    public struct PointWithSegments
+    {
+        public Segment SegmentPrev;
+        public Segment SegmentNext;
+        public Vector2 Point;
+        public PointWithSegments(Vector2 point, Segment prev, Segment next)
+        {
+            Point = point;
+            SegmentNext = next;
+            SegmentPrev = prev;
+        }
     }
 
     struct PointAndAngle : IComparable<PointAndAngle>
