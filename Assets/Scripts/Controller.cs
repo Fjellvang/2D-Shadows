@@ -25,7 +25,6 @@ public class Controller : MonoBehaviour
     Segment[] Segments;
     Vector2[] AllPoints;
     float[] Angles;
-    List<DirectionAndAngle> directionAndAngles = new List<DirectionAndAngle>();
     MeshFilter MeshFilter;
     List<PointAndAngle> pointAndAngles = new List<PointAndAngle>();//TODO: Don't new up here
     // Start is called before the first frame update
@@ -67,9 +66,6 @@ public class Controller : MonoBehaviour
 
         Movement();
 
-        directionAndAngles.Clear();
-        //angles.Clear();
-
         int angleIndex = 0;
         for (int i = 0; i < AllPoints.Length; i++)
         {
@@ -91,28 +87,31 @@ public class Controller : MonoBehaviour
             Vector2 minIntersect = new Vector2();
             var min_angle = 0f;
             var found = false;
-            Debug.DrawRay(transform.position, new Vector3(raydeltax, raydeltay), Color.yellow);
             for (int j = 0; j < Segments.Length; j++)
             {
                 var segmentDelta = Segments[j].b - Segments[j].a;
-                if (Mathf.Abs(segmentDelta.x - raydeltax) > 0 && Mathf.Abs(segmentDelta.y - raydeltay) > 0)
+                if (Mathf.Abs(segmentDelta.x - raydeltax) <= 0 || Mathf.Abs(segmentDelta.y - raydeltay) <= 0)
                 {
-                    var seg = Segments[j];
-                    var t2 = (raydeltax * (seg.a.y - origPos.y) + (raydeltay * (origPos.x - seg.a.x))) / (segmentDelta.x * raydeltay - segmentDelta.y * raydeltax);
-                    var t1 = (seg.a.x + segmentDelta.x * t2 - origPos.x) / raydeltax;
-                    if (t1 > 0 && t2 >= 0 && t2 <= 1.0f)
-                    {
-                        if (t1 < min_t1)
-                        {
-                            min_t1 = t1;
-                            //TODO: Maybe not new em up here... Potential GC overload??
-                            minIntersect = new Vector2(origPos.x + raydeltax * t1, origPos.y + raydeltay * t1);
+                    continue;
+                }
 
-                            //TODO: maybe not recalculate angle, just use that sort by angle without calculating?
-                            min_angle = Mathf.Atan2(minIntersect.y - origPos.y, minIntersect.x - origPos.x);
-                            found = true;
-                        }
-                    }
+                var seg = Segments[j];
+                var t2 = (raydeltax * (seg.a.y - origPos.y) + (raydeltay * (origPos.x - seg.a.x))) / (segmentDelta.x * raydeltay - segmentDelta.y * raydeltax);
+                var t1 = (seg.a.x + segmentDelta.x * t2 - origPos.x) / raydeltax;
+                if (t1 <= 0 || t2 < 0 || t2 > 1.0f)
+                {
+                    continue;
+                }
+
+                if (t1 < min_t1)
+                {
+                    min_t1 = t1;
+
+                    minIntersect = new Vector2(origPos.x + raydeltax * t1, origPos.y + raydeltay * t1);
+
+                    //TODO: maybe not recalculate angle, just use that sort by angle without calculating?
+                    min_angle = Mathf.Atan2(minIntersect.y - origPos.y, minIntersect.x - origPos.x);
+                    found = true;
                 }
             }
             if (found)
