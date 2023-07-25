@@ -10,7 +10,6 @@ using UnityEngine;
 /// </summary>
 public class Controller : MonoBehaviour
 {
-    Transform transform;
     [SerializeField]
     float speed = 10;
     public float radius = 5f;
@@ -20,18 +19,22 @@ public class Controller : MonoBehaviour
     public Material mat;
     MeshRenderer renderer;
 
-
     ColliderVertices[] colliderVertices;
     Segment[] Segments;
     Vector2[] AllPoints;
     float[] Angles;
     MeshFilter MeshFilter;
-    List<PointAndAngle> pointAndAngles = new List<PointAndAngle>();//TODO: Don't new up here
+    List<PointAndAngle> pointAndAngles = new List<PointAndAngle>();
+
+    [SerializeField]
+    BoxCollider2D _visionBounds;
+
+    BoxCollider2D[] walls;
+
     // Start is called before the first frame update
     void Start()
     {
-        transform = GetComponent<Transform>();
-        Segments = FindAllLines();
+        Segments = FindAllLines(walls);
         //TODO: Optimize this;
         var points = new List<Vector2>();
         foreach (var item in Segments)
@@ -44,6 +47,7 @@ public class Controller : MonoBehaviour
     }
     private void Awake()
     {
+        walls = GameObject.FindGameObjectsWithTag("wall").Select(x => x.GetComponent<BoxCollider2D>()).ToArray();
         FindAllWalls();
         MeshFilter = GetComponentInChildren<MeshFilter>();
         renderer = GetComponentInChildren<MeshRenderer>();
@@ -56,13 +60,23 @@ public class Controller : MonoBehaviour
         {
             Gizmos.DrawSphere(item.Point, 0.2f);
         }
+
+        foreach (var vertice in colliderVertices)
+        {
+            Gizmos.DrawSphere(vertice.Vertices[0], 0.2f);
+            Gizmos.DrawSphere(vertice.Vertices[1], 0.2f);
+            Gizmos.DrawSphere(vertice.Vertices[2], 0.2f);
+            Gizmos.DrawSphere(vertice.Vertices[3], 0.2f);
+        }
     }
 
-    List<float> angles = new List<float>(); //TODO: FIND BETTER;
     // Update is called once per frame
     void Update()
     {
-        colliderVertices[colliderVertices.Length - 1] = new ColliderVertices(Camera.main);
+        Segments = FindAllLines(walls);
+        FindAllWalls();
+
+        colliderVertices[colliderVertices.Length - 1] = new ColliderVertices(_visionBounds);
 
         Movement();
 
@@ -71,9 +85,9 @@ public class Controller : MonoBehaviour
         {
             var delta = (Vector3)AllPoints[i] - transform.position;
             float angle = Mathf.Atan2(delta.y, delta.x);
-            Angles[angleIndex++] = (angle - 0.001f);
-            Angles[angleIndex++] = (angle);
-            Angles[angleIndex++] = (angle + 0.001f);
+            Angles[angleIndex++] = angle - 0.001f;
+            Angles[angleIndex++] = angle;
+            Angles[angleIndex++] = angle + 0.001f;
         }
 
         pointAndAngles.Clear();
@@ -96,7 +110,9 @@ public class Controller : MonoBehaviour
                 }
 
                 var seg = Segments[j];
-                var t2 = (raydeltax * (seg.a.y - origPos.y) + (raydeltay * (origPos.x - seg.a.x))) / (segmentDelta.x * raydeltay - segmentDelta.y * raydeltax);
+                var t2 = 
+                        (raydeltax * (seg.a.y - origPos.y) + (raydeltay * (origPos.x - seg.a.x))) / 
+                        (segmentDelta.x * raydeltay - segmentDelta.y * raydeltax);
                 var t1 = (seg.a.x + segmentDelta.x * t2 - origPos.x) / raydeltax;
                 if (t1 <= 0 || t2 < 0 || t2 > 1.0f)
                 {
@@ -183,45 +199,60 @@ public class Controller : MonoBehaviour
 
     public void FindAllWalls()
     {
-        var retval = GameObject.FindGameObjectsWithTag("wall")
-            .Select(x => new ColliderVertices(x.GetComponent<BoxCollider2D>()))
-            .ToList();
-        //TODO THIS SHIT IS DYNAMIC, CHANGE IT.
-        retval.Add(new ColliderVertices(Camera.main));
-        colliderVertices = retval.ToArray();
+        colliderVertices = new []
+        {
+            new ColliderVertices(_visionBounds)
+        };
+        //var retval = walls
+        //    .Select(x => new ColliderVertices(x))
+        //    .ToList();
+        ////TODO THIS SHIT IS DYNAMIC, CHANGE IT.
+        //retval.Add(new ColliderVertices(_visionBounds));
+        //colliderVertices = retval.ToArray();
     }
 
-    public Segment[] FindAllLines()
+    public Segment[] FindAllLines(BoxCollider2D[] allwalls)
     {
-        var allwalls = GameObject.FindGameObjectsWithTag("wall").Select(x=> x.GetComponent<BoxCollider2D>()).ToArray();
-        List<Segment> retval = new List<Segment>();
-        foreach (var collider in allwalls)
-        {
-            var center = collider.bounds.center;
-            var extents = collider.bounds.extents;
-            var NorthEast = center + extents;
-            var SouthEast = center + new Vector3(extents.x, -extents.y);
-            var SouthWest = center + new Vector3(-extents.x, -extents.y);
-            var NorthWest = center + new Vector3(-extents.x, extents.y);
-            retval.Add(new Segment { a = NorthEast, b = SouthEast });
-            retval.Add(new Segment { a = SouthEast, b = SouthWest });
-            retval.Add( new Segment { a = SouthWest, b = NorthWest });
-            retval.Add( new Segment { a = NorthWest, b = NorthEast });
-        }
-        var cam = Camera.main;
-        var vert = cam.orthographicSize;//Camera.main.orthographicSize;
-        var horz = vert * Screen.width / Screen.height;
-        var camPos = Camera.main.transform.position;
-        var northeast =  new Vector3(camPos.x + vert, camPos.y + horz, 0);
-        var southeast = new Vector3(camPos.x + vert, camPos.y - horz, 0);
-        var southwest = new Vector3(camPos.x - vert, camPos.y - horz, 0);
-        var northwest = new Vector3(camPos.x - vert, camPos.y + horz, 0);
-        retval.Add(new Segment { a = northeast, b = southeast });
-        retval.Add( new Segment { a = southeast, b = southwest });
-        retval.Add( new Segment { a = southwest, b = northwest });
-        retval.Add( new Segment { a = northwest, b = northeast });
-        return retval.ToArray();
+        //var allwalls = GameObject.FindGameObjectsWithTag("wall").Select(x=> x.GetComponent<BoxCollider2D>()).ToArray();
+        //var segments = new Segment[allwalls.Length * 4 + 4];
+        var segments = new Segment[4];
+        int segmentIndex = 0;
+        //foreach (var collider in allwalls)
+        //{
+        //    CalculateSegmentsForBoxCollider(segmentIndex, segments, collider);
+        //    segmentIndex += 4;
+        //}
+
+        CalculateSegmentsForBoxCollider(segmentIndex, segments, _visionBounds);
+        //var cam = Camera.main;
+        //var vert = cam.orthographicSize;//Camera.main.orthographicSize;
+        //var horz = vert * Screen.width / Screen.height;
+        //var camPos = Camera.main.transform.position;
+        //var northeast =  new Vector3(camPos.x + vert, camPos.y + horz, 0);
+        //var southeast = new Vector3(camPos.x + vert, camPos.y - horz, 0);
+        //var southwest = new Vector3(camPos.x - vert, camPos.y - horz, 0);
+        //var northwest = new Vector3(camPos.x - vert, camPos.y + horz, 0);
+        //retval.Add(new Segment { a = northeast, b = southeast });
+        //retval.Add( new Segment { a = southeast, b = southwest });
+        //retval.Add( new Segment { a = southwest, b = northwest });
+        //retval.Add( new Segment { a = northwest, b = northeast });
+        return segments;
     }
+
+    private static void CalculateSegmentsForBoxCollider(int segmentIndex, Segment[] segments, BoxCollider2D collider)
+    {
+        var center = collider.bounds.center;
+        var extents = collider.bounds.extents;
+        var NorthEast = center + extents;
+        var SouthEast = center + new Vector3(extents.x, -extents.y);
+        var SouthWest = center + new Vector3(-extents.x, -extents.y);
+        var NorthWest = center + new Vector3(-extents.x, extents.y);
+        segments[segmentIndex++] = (new Segment { a = NorthEast, b = SouthEast });
+        segments[segmentIndex++] = (new Segment { a = SouthEast, b = SouthWest });
+        segments[segmentIndex++] = (new Segment { a = SouthWest, b = NorthWest });
+        segments[segmentIndex++] = (new Segment { a = NorthWest, b = NorthEast });
+    }
+
     public struct Segment
     {
         public Vector2 a;
