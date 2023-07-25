@@ -10,7 +10,6 @@ using UnityEngine;
 /// </summary>
 public class Controller : MonoBehaviour
 {
-    Transform transform;
     [SerializeField]
     float speed = 10;
     public float radius = 5f;
@@ -29,16 +28,21 @@ public class Controller : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        transform = GetComponent<Transform>();
         //TODO: Optimize this;
+        GetAllPoints();
+        Angles = new float[AllPoints.Length * 3];
+    }
+
+    private void GetAllPoints()
+    {
         var points = new List<Vector2>();
         foreach (var item in colliderVertices.SelectMany(x => x.Vertices))
         {
             points.Add(item);
         }
         AllPoints = points.ToArray();
-        Angles = new float[AllPoints.Length*3];
     }
+
     private void Awake()
     {
         FindAllWalls();
@@ -58,7 +62,9 @@ public class Controller : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        colliderVertices[colliderVertices.Length - 1] = new ColliderVertices(Camera.main);
+        FindAllWalls();
+        GetAllPoints();
+        //colliderVertices[colliderVertices.Length - 1] = new ColliderVertices(Camera.main);
 
         Movement();
 
@@ -77,7 +83,6 @@ public class Controller : MonoBehaviour
         var origPos = transform.position;
         for (int i = 0; i < Angles.Length; i++)
         {
-
             var rayDirection = new Vector3(Mathf.Cos(Angles[i]), Mathf.Sin(Angles[i]));
             RaycastHit2D hit = Physics2D.Raycast(origPos, rayDirection, radius, mask);
 
