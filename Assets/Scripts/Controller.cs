@@ -22,7 +22,6 @@ public class Controller : MonoBehaviour
 
 
     ColliderVertices[] colliderVertices;
-    Segment[] Segments;
     Vector2[] AllPoints;
     float[] Angles;
     MeshFilter MeshFilter;
@@ -31,15 +30,13 @@ public class Controller : MonoBehaviour
     void Start()
     {
         transform = GetComponent<Transform>();
-        Segments = FindAllLines();
         //TODO: Optimize this;
         var points = new List<Vector2>();
-        foreach (var item in Segments)
+        foreach (var item in colliderVertices.SelectMany(x => x.Vertices))
         {
-            points.Add(item.a);
-            points.Add(item.b);
+            points.Add(item);
         }
-        AllPoints = points.Distinct().ToArray();
+        AllPoints = points.ToArray();
         Angles = new float[AllPoints.Length*3];
     }
     private void Awake()
@@ -58,7 +55,6 @@ public class Controller : MonoBehaviour
         }
     }
 
-    List<float> angles = new List<float>(); //TODO: FIND BETTER;
     // Update is called once per frame
     void Update()
     {
@@ -104,19 +100,19 @@ public class Controller : MonoBehaviour
     {
         if (Input.GetKey(KeyCode.W))
         {
-            transform.position += Vector3.up * speed * Time.deltaTime;
+            transform.position += speed * Time.deltaTime * Vector3.up;
         }
         if (Input.GetKey(KeyCode.D))
         {
-            transform.position += Vector3.right * speed * Time.deltaTime;
+            transform.position += speed * Time.deltaTime * Vector3.right;
         }
         if (Input.GetKey(KeyCode.S))
         {
-            transform.position += Vector3.up * -speed * Time.deltaTime;
+            transform.position += -speed * Time.deltaTime * Vector3.up;
         }
         if (Input.GetKey(KeyCode.A))
         {
-            transform.position += Vector3.right * -speed * Time.deltaTime;
+            transform.position += -speed * Time.deltaTime * Vector3.right;
         }
     }
 
@@ -162,43 +158,6 @@ public class Controller : MonoBehaviour
         //TODO THIS SHIT IS DYNAMIC, CHANGE IT.
         retval.Add(new ColliderVertices(Camera.main));
         colliderVertices = retval.ToArray();
-    }
-
-    public Segment[] FindAllLines()
-    {
-        var allwalls = GameObject.FindGameObjectsWithTag("wall").Select(x=> x.GetComponent<BoxCollider2D>()).ToArray();
-        List<Segment> retval = new List<Segment>();
-        foreach (var collider in allwalls)
-        {
-            var center = collider.bounds.center;
-            var extents = collider.bounds.extents;
-            var NorthEast = center + extents;
-            var SouthEast = center + new Vector3(extents.x, -extents.y);
-            var SouthWest = center + new Vector3(-extents.x, -extents.y);
-            var NorthWest = center + new Vector3(-extents.x, extents.y);
-            retval.Add(new Segment { a = NorthEast, b = SouthEast });
-            retval.Add(new Segment { a = SouthEast, b = SouthWest });
-            retval.Add( new Segment { a = SouthWest, b = NorthWest });
-            retval.Add( new Segment { a = NorthWest, b = NorthEast });
-        }
-        var cam = Camera.main;
-        var vert = cam.orthographicSize;//Camera.main.orthographicSize;
-        var horz = vert * Screen.width / Screen.height;
-        var camPos = Camera.main.transform.position;
-        var northeast =  new Vector3(camPos.x + vert, camPos.y + horz, 0);
-        var southeast = new Vector3(camPos.x + vert, camPos.y - horz, 0);
-        var southwest = new Vector3(camPos.x - vert, camPos.y - horz, 0);
-        var northwest = new Vector3(camPos.x - vert, camPos.y + horz, 0);
-        retval.Add(new Segment { a = northeast, b = southeast });
-        retval.Add( new Segment { a = southeast, b = southwest });
-        retval.Add( new Segment { a = southwest, b = northwest });
-        retval.Add( new Segment { a = northwest, b = northeast });
-        return retval.ToArray();
-    }
-    public struct Segment
-    {
-        public Vector2 a;
-        public Vector2 b;
     }
 
     struct ColliderVertices
