@@ -24,6 +24,7 @@ public class Controller : MonoBehaviour
     ColliderVertices[] colliderVertices;
     Segment[] Segments;
     Vector2[] AllPoints;
+    float[] Angles;
     List<DirectionAndAngle> directionAndAngles = new List<DirectionAndAngle>();
     MeshFilter MeshFilter;
     List<PointAndAngle> pointAndAngles = new List<PointAndAngle>();//TODO: Don't new up here
@@ -40,6 +41,7 @@ public class Controller : MonoBehaviour
             points.Add(item.b);
         }
         AllPoints = points.Distinct().ToArray();
+        Angles = new float[AllPoints.Length*3];
     }
     private void Awake()
     {
@@ -63,6 +65,71 @@ public class Controller : MonoBehaviour
     {
         colliderVertices[colliderVertices.Length - 1] = new ColliderVertices(Camera.main);
 
+        Movement();
+
+        directionAndAngles.Clear();
+        //angles.Clear();
+
+        int angleIndex = 0;
+        for (int i = 0; i < AllPoints.Length; i++)
+        {
+            var delta = (Vector3)AllPoints[i] - transform.position;
+            float angle = Mathf.Atan2(delta.y, delta.x);
+            Angles[angleIndex++] = (angle - 0.001f);
+            Angles[angleIndex++] = (angle);
+            Angles[angleIndex++] = (angle + 0.001f);
+        }
+
+        pointAndAngles.Clear();
+
+        var origPos = transform.position;
+        for (int i = 0; i < Angles.Length; i++)
+        {
+            var raydeltax = radius * Mathf.Cos(Angles[i]);
+            var raydeltay = radius * Mathf.Sin(Angles[i]);
+            var min_t1 = float.MaxValue;
+            Vector2 minIntersect = new Vector2();
+            var min_angle = 0f;
+            var found = false;
+            Debug.DrawRay(transform.position, new Vector3(raydeltax, raydeltay), Color.yellow);
+            for (int j = 0; j < Segments.Length; j++)
+            {
+                var segmentDelta = Segments[j].b - Segments[j].a;
+                if (Mathf.Abs(segmentDelta.x - raydeltax) > 0 && Mathf.Abs(segmentDelta.y - raydeltay) > 0)
+                {
+                    var seg = Segments[j];
+                    var t2 = (raydeltax * (seg.a.y - origPos.y) + (raydeltay * (origPos.x - seg.a.x))) / (segmentDelta.x * raydeltay - segmentDelta.y * raydeltax);
+                    var t1 = (seg.a.x + segmentDelta.x * t2 - origPos.x) / raydeltax;
+                    if (t1 > 0 && t2 >= 0 && t2 <= 1.0f)
+                    {
+                        if (t1 < min_t1)
+                        {
+                            min_t1 = t1;
+                            //TODO: Maybe not new em up here... Potential GC overload??
+                            minIntersect = new Vector2(origPos.x + raydeltax * t1, origPos.y + raydeltay * t1);
+
+                            //TODO: maybe not recalculate angle, just use that sort by angle without calculating?
+                            min_angle = Mathf.Atan2(minIntersect.y - origPos.y, minIntersect.x - origPos.x);
+                            found = true;
+                        }
+                    }
+                }
+            }
+            if (found)
+            {
+                pointAndAngles.Add(new PointAndAngle() { Point = minIntersect, angle = min_angle });
+            }
+            else
+            {
+                pointAndAngles.Add(new PointAndAngle() { Point = new Vector3(raydeltax, raydeltay) });
+            }
+        }
+
+        GenerateMesh();
+    }
+
+    private void Movement()
+    {
         if (Input.GetKey(KeyCode.W))
         {
             transform.position += Vector3.up * speed * Time.deltaTime;
@@ -79,102 +146,42 @@ public class Controller : MonoBehaviour
         {
             transform.position += Vector3.right * -speed * Time.deltaTime;
         }
-        directionAndAngles.Clear();
-        //directionAndAngles = colliderVertices.SelectMany(x => x.Vertices.Select(v => new DirectionAndAngle(transform.position, v))).OrderByDescending(d => d.angle).ToList();
-        angles.Clear();
-        for (int i = 0; i < AllPoints.Length; i++)
-        {
-            var delta = (Vector3)AllPoints[i] - transform.position;
-            float angle = Mathf.Atan2(delta.y, delta.x);
-            //Debug.DrawRay(transform.position, delta, Color.white);
-            angles.Add(angle - 0.001f);
-            angles.Add(angle);
-            angles.Add(angle + 0.001f);
-        }
+    }
 
-        pointAndAngles.Clear();
-
-        var origPos = transform.position;
-        for (int i = 0; i < angles.Count; i++)
-        {
-            var raydeltax = radius * Mathf.Cos(angles[i]);
-            var raydeltay = radius * Mathf.Sin(angles[i]);
-            var min_t1 = float.MaxValue;
-            Vector2 minIntersect = new Vector2();
-            var min_angle = 0f;
-            var found = false;
-            Debug.DrawRay(transform.position, new Vector3(raydeltax, raydeltay), Color.yellow);
-            for (int j = 0; j < Segments.Length; j++)
-            {
-                var segmentDelta = Segments[j].b - Segments[j].a;
-                if (Mathf.Abs(segmentDelta.x - raydeltax) > 0 && Mathf.Abs(segmentDelta.y - raydeltay) > 0)
-                {
-                    var seg = Segments[j];
-                    var t2 = (raydeltax * (seg.a.y - origPos.y) + (raydeltay * (origPos.x - seg.a.x))) / (segmentDelta.x * raydeltay - segmentDelta.y * raydeltax);
-                    var t1 = (seg.a.x + segmentDelta.x * t2 - origPos.x) / raydeltax;
-                    if (t1 > 0 && t2 >= 0 && t2<=1.0f)
-                    {
-                        if (t1<min_t1)
-                        {
-                            min_t1 = t1;
-                            //TODO: Maybe not new em up here... Potential GC overload??
-                            minIntersect = new Vector2(origPos.x + raydeltax * t1, origPos.y + raydeltay * t1);
-
-                            //TODO: maybe not recalculate angle, just use that sort by angle without calculating?
-                            min_angle = Mathf.Atan2(minIntersect.y - origPos.y, minIntersect.x - origPos.x);
-                            found = true;
-                        }
-                    }
-                }
-            }
-            if (found)
-            {
-                pointAndAngles.Add(new PointAndAngle() { Point = minIntersect, angle = min_angle });
-                Debug.DrawRay(transform.position, minIntersect, Color.red);
-            }
-            else
-            {
-                pointAndAngles.Add(new PointAndAngle() { Point = new Vector3(raydeltax, raydeltay) });
-                Debug.Log("intersect not found - draw anyway?");
-                //Debug.DrawLine(transform.position, new Vector3(dx, dy));
-            }
-        }
-
+    private void GenerateMesh()
+    {
         pointAndAngles.Sort();
         //MESH GENERATION
         Vector3[] vertices = new Vector3[pointAndAngles.Count * 2 + 1];
-        List<int> triangles = new List<int>();
-        //vertices.Clear();
-        triangles.Clear();
-
+        int[] triangles = new int[vertices.Length * 3 + 3];
         vertices[0] = (transform.InverseTransformPoint(transform.position)); // Wonder if conversion is needed
 
         for (int i = 1; i <= pointAndAngles.Count; i++)
         {
-            vertices[i] = transform.InverseTransformPoint(pointAndAngles[i-1].Point);
+            vertices[i] = transform.InverseTransformPoint(pointAndAngles[i - 1].Point);
             vertices[i + 1] = transform.InverseTransformPoint(pointAndAngles[(i) % pointAndAngles.Count].Point);
         }
 
-        for (int i = 0; i < vertices.Length+1; i++)
+        int triangleIndex = 0;
+        for (int i = 0; i < vertices.Length + 1; i++)
         {
-            triangles.Add((i + 1) % vertices.Length);
-            triangles.Add((i) % vertices.Length);
-            triangles.Add(0);
+            triangles[triangleIndex++] = (i + 1) % vertices.Length;
+            triangles[triangleIndex++] = i % vertices.Length;
+            triangles[triangleIndex++] = 0;
         }
 
 
-        MeshFilter.mesh.Clear();
         var mesh = new Mesh()
         {
             vertices = vertices,
-            triangles = triangles.ToArray(),
-            
+            triangles = triangles,
         };
         mesh.RecalculateBounds();
         mesh.RecalculateNormals();
 
         MeshFilter.mesh = mesh;
     }
+
     public void FindAllWalls()
     {
         var retval = GameObject.FindGameObjectsWithTag("wall")
