@@ -166,7 +166,7 @@ public class Controller : MonoBehaviour
         MeshFilter.mesh.Clear();
         var mesh = new Mesh()
         {
-            vertices = vertices.ToArray(),
+            vertices = vertices,
             triangles = triangles.ToArray(),
             
         };
