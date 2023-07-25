@@ -81,43 +81,19 @@ public class Controller : MonoBehaviour
         var origPos = transform.position;
         for (int i = 0; i < Angles.Length; i++)
         {
-            var raydeltax = radius * Mathf.Cos(Angles[i]);
-            var raydeltay = radius * Mathf.Sin(Angles[i]);
-            var min_t1 = float.MaxValue;
-            Vector2 minIntersect = new Vector2();
-            var found = false;
-            for (int j = 0; j < Segments.Length; j++)
+
+            var rayDirection = new Vector3(Mathf.Cos(Angles[i]), Mathf.Sin(Angles[i]));
+            RaycastHit2D hit = Physics2D.Raycast(origPos, rayDirection, radius, mask);
+
+            if (hit.collider != null)
             {
-                var segmentDelta = Segments[j].b - Segments[j].a;
-                if (Mathf.Abs(segmentDelta.x - raydeltax) <= 0 || Mathf.Abs(segmentDelta.y - raydeltay) <= 0)
-                {
-                    continue;
-                }
-
-                var seg = Segments[j];
-                var t2 = (raydeltax * (seg.a.y - origPos.y) + (raydeltay * (origPos.x - seg.a.x))) / (segmentDelta.x * raydeltay - segmentDelta.y * raydeltax);
-                var t1 = (seg.a.x + segmentDelta.x * t2 - origPos.x) / raydeltax;
-                if (t1 <= 0 || t2 < 0 || t2 > 1.0f)
-                {
-                    continue;
-                }
-
-                if (t1 < min_t1)
-                {
-                    min_t1 = t1;
-
-                    minIntersect = new Vector2(origPos.x + raydeltax * t1, origPos.y + raydeltay * t1);
-
-                    found = true;
-                }
-            }
-            if (found)
-            {
-                pointAndAngles.Add(new PointAndAngle() { Point = minIntersect, angle = Angles[i] });
+                // If we hit something, we use that point
+                pointAndAngles.Add(new PointAndAngle() { Point = hit.point, angle = Angles[i] });
             }
             else
             {
-                pointAndAngles.Add(new PointAndAngle() { Point = new Vector3(raydeltax, raydeltay) });
+                // If we didn't hit anything, we use the point on the edge of the circle
+                pointAndAngles.Add(new PointAndAngle() { Point = origPos + rayDirection * radius, angle = Angles[i] });
             }
         }
 
