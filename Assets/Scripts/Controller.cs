@@ -85,7 +85,6 @@ public class Controller : MonoBehaviour
             var raydeltay = radius * Mathf.Sin(Angles[i]);
             var min_t1 = float.MaxValue;
             Vector2 minIntersect = new Vector2();
-            var min_angle = 0f;
             var found = false;
             for (int j = 0; j < Segments.Length; j++)
             {
@@ -109,14 +108,12 @@ public class Controller : MonoBehaviour
 
                     minIntersect = new Vector2(origPos.x + raydeltax * t1, origPos.y + raydeltay * t1);
 
-                    //TODO: maybe not recalculate angle, just use that sort by angle without calculating?
-                    min_angle = Mathf.Atan2(minIntersect.y - origPos.y, minIntersect.x - origPos.x);
                     found = true;
                 }
             }
             if (found)
             {
-                pointAndAngles.Add(new PointAndAngle() { Point = minIntersect, angle = min_angle });
+                pointAndAngles.Add(new PointAndAngle() { Point = minIntersect, angle = Angles[i] });
             }
             else
             {
