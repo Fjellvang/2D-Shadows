@@ -56,6 +56,8 @@ public class Controller : MonoBehaviour
             Gizmos.DrawSphere(item.Point, 0.2f);
         }
     }
+
+    List<float> angles = new List<float>(); //TODO: FIND BETTER;
     // Update is called once per frame
     void Update()
     {
@@ -79,7 +81,6 @@ public class Controller : MonoBehaviour
         }
         directionAndAngles.Clear();
         //directionAndAngles = colliderVertices.SelectMany(x => x.Vertices.Select(v => new DirectionAndAngle(transform.position, v))).OrderByDescending(d => d.angle).ToList();
-        var angles = new List<float>(); //TODO: FIND BETTER;
         angles.Clear();
         for (int i = 0; i < AllPoints.Length; i++)
         {
@@ -140,38 +141,26 @@ public class Controller : MonoBehaviour
         }
 
         pointAndAngles.Sort();
-        //for (int i = 0; i < directionAndAngles.Count(); i++)
-        //{
-        //    var angle1 = directionAndAngles[i].angle - 0.0001f;
-        //    var angle2 = directionAndAngles[i].angle + 0.0001f;
-        //    Debug.DrawRay(transform.position, new Vector3(Mathf.Cos(angle1), Mathf.Sin(angle1))*10, Color.blue);
-        //    Debug.DrawRay(transform.position, directionAndAngles[i].direction);
-        //    Debug.DrawRay(transform.position, new Vector3(Mathf.Cos(angle2), Mathf.Sin(angle2))*10, Color.red);
-        //}
         //MESH GENERATION
-        List<Vector3> vertices = new List<Vector3>();
+        Vector3[] vertices = new Vector3[pointAndAngles.Count * 2 + 1];
         List<int> triangles = new List<int>();
-        vertices.Clear();
+        //vertices.Clear();
         triangles.Clear();
 
-        vertices.Add(transform.InverseTransformPoint(transform.position)); // Wonder if conversion is needed
+        vertices[0] = (transform.InverseTransformPoint(transform.position)); // Wonder if conversion is needed
 
-        for (int i = 0; i < pointAndAngles.Count; i++)
+        for (int i = 1; i <= pointAndAngles.Count; i++)
         {
-            vertices.Add(transform.InverseTransformPoint(pointAndAngles[i].Point));
-            vertices.Add(transform.InverseTransformPoint(pointAndAngles[(i+1) % pointAndAngles.Count].Point));
+            vertices[i] = transform.InverseTransformPoint(pointAndAngles[i-1].Point);
+            vertices[i + 1] = transform.InverseTransformPoint(pointAndAngles[(i) % pointAndAngles.Count].Point);
         }
 
-        for (int i = 0; i < vertices.Count+1; i++)
+        for (int i = 0; i < vertices.Length+1; i++)
         {
-            triangles.Add((i + 1) % vertices.Count);
-            triangles.Add((i) % vertices.Count);
+            triangles.Add((i + 1) % vertices.Length);
+            triangles.Add((i) % vertices.Length);
             triangles.Add(0);
         }
-
-        //OLD
-        //Triangulator triangulator = new Triangulator(directionAndAngles.Select(x => new Vector2(x.direction.x, x.direction.y)).ToArray());
-        //var indicies = triangulator.Triangulate();
 
 
         MeshFilter.mesh.Clear();
@@ -185,25 +174,6 @@ public class Controller : MonoBehaviour
         mesh.RecalculateNormals();
 
         MeshFilter.mesh = mesh;
-        //colliders.Clear();
-        //for (int i = 0; i < 360; i += 2)
-        //{
-        //    var rads = i * Mathf.Deg2Rad;
-        //    var x = Mathf.Cos(rads);
-        //    var y = Mathf.Sin(rads);
-
-        //    var hit = Physics2D.Raycast(transform.position, new Vector2(x, y), 5, mask);
-        //    if (hit)
-        //    {
-        //        Debug.DrawLine(transform.position, hit.point, Color.red);
-        //        if (!colliders.Contains(hit.collider))
-        //        {
-        //            colliders.Add(hit.collider); 
-        //        }
-        //    }
-        //}
-        //Debug.Log($"Len: {colliders.Count}");
-
     }
     public void FindAllWalls()
     {
