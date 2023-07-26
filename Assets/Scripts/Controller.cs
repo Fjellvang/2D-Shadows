@@ -10,6 +10,7 @@ using UnityEngine;
 /// </summary>
 public class Controller : MonoBehaviour
 {
+    public float angleEpsilon = 0.005f;
     [SerializeField]
     float speed = 10;
     public float radius = 5f;
@@ -73,9 +74,9 @@ public class Controller : MonoBehaviour
         {
             var delta = (Vector3)AllPoints[i] - transform.position;
             float angle = Mathf.Atan2(delta.y, delta.x);
-            Angles[angleIndex++] = (angle - 0.001f);
+            Angles[angleIndex++] = (angle - angleEpsilon);
             Angles[angleIndex++] = (angle);
-            Angles[angleIndex++] = (angle + 0.001f);
+            Angles[angleIndex++] = (angle + angleEpsilon);
         }
 
         pointAndAngles.Clear();
