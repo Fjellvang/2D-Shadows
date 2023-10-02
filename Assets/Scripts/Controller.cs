@@ -27,7 +27,7 @@ public class Controller : MonoBehaviour
 
     float[] Angles;
     MeshFilter MeshFilter;
-    List<PointAndAngle> pointAndAngles = new List<PointAndAngle>();//TODO: Don't new up here
+    List<PointAndAngle> pointAndAngles = new List<PointAndAngle>();
     List<BoxCollider2D> _staticBoxColliders;
     // Start is called before the first frame update
     void Start()

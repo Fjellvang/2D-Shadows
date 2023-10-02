@@ -5,6 +5,7 @@ Shader "Unlit/TestShader"
         _MainTex ("Texture", 2D) = "white" {}
         _Angle("Angle", Range(0,180)) = 180
         _Tint("Tint", Color) = (1,1,1,1)
+        _Range("RangeMultiplier", Range(1,5)) = 2
     }
     SubShader
     {
@@ -37,6 +38,7 @@ Shader "Unlit/TestShader"
             sampler2D _MainTex;
             float4 _MainTex_ST;
             float _Angle;
+            float _Range;
             float4 _Tint;
 
 
@@ -63,7 +65,7 @@ Shader "Unlit/TestShader"
                 float mask = step(-_Angle, angle) * step(angle, _Angle);
                 //float mask = step(180.0 - _Angle, angle) * step(angle, 180.0 + _Angle);
 
-                return col * (1-dist*2) * (1-mask) * _Tint;
+                return col * (1-dist * _Range) * mask * _Tint;
             }
             ENDCG
         }
