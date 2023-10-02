@@ -14,44 +14,44 @@ public class Controller : MonoBehaviour
 
     [SerializeField]
     float speed = 10;
-    public float radius = 5f;
 
     public LayerMask mask;
 
     public Material mat;
-    MeshRenderer renderer;
+    MeshRenderer _renderer;
+
+    Vector2[] _allPoints;
+
+    float[] _angles;
+    MeshFilter _meshFilter;
+    List<PointAndAngle> _pointAndAngles = new List<PointAndAngle>();
+
+    Collider2D[] _preallocatedColliders = new Collider2D[16]; // Is 16 enough?
+    Segment[] _segments;
 
 
-    Segment[] Segments;
-    List<Vector2> AllPoints = new List<Vector2>();
-
-    float[] Angles;
-    MeshFilter MeshFilter;
-    List<PointAndAngle> pointAndAngles = new List<PointAndAngle>();
-    List<BoxCollider2D> _staticBoxColliders;
-    // Start is called before the first frame update
-    void Start()
+    private void CalculatePointsAndAngles(Collider2D[] staticColliders, int hitCount)
     {
-        _staticBoxColliders = GameObject.FindGameObjectsWithTag("wall").Select(x => x.GetComponent<BoxCollider2D>()).ToList();
-        CalculatePointsAndAngles(_staticBoxColliders);
-    }
-
-    private void CalculatePointsAndAngles(List<BoxCollider2D> staticColliders)
-    {
-        Segments = FindAllLines(staticColliders);
-        Angles = new float[AllPoints.Count * 3];
+        PopulateAllSegmentsAndPoints(staticColliders, hitCount);
+        //_angles = new float[_allPoints.Count * 3];
     }
 
     private void Awake()
     {
-        MeshFilter = GetComponentInChildren<MeshFilter>();
-        renderer = GetComponentInChildren<MeshRenderer>();
-        renderer.material = mat;
+        //Add 4 to each to account for the vision bounds
+        _segments = new Segment[_preallocatedColliders.Length * 4 + 4]; // 4 points per collider, since we only use bounding box for now
+        _allPoints = new Vector2[_preallocatedColliders.Length * 4 + 4]; // 4 points per collider
+
+        _angles = new float[_allPoints.Length * 3]; // 3 angles per point
+
+        _meshFilter = GetComponentInChildren<MeshFilter>();
+        _renderer = GetComponentInChildren<MeshRenderer>();
+        _renderer.material = mat;
     }
 
     private void OnDrawGizmos()
     {
-        foreach (var item in pointAndAngles)
+        foreach (var item in _pointAndAngles)
         {
             Gizmos.DrawSphere(item.Point, 0.2f);
         }
@@ -60,36 +60,39 @@ public class Controller : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        CalculatePointsAndAngles(_staticBoxColliders);
+        //var colliders = Physics2D.OverlapBoxAll(transform.position, VisionBounds.size, 360, mask);
+
+        _pointAndAngles.Clear();
+        var hitcount = Physics2D.OverlapBoxNonAlloc(transform.position, VisionBounds.size, 360, _preallocatedColliders, mask);
+        CalculatePointsAndAngles(_preallocatedColliders, hitcount);
+
 
         Movement();
 
         int angleIndex = 0;
-        for (int i = 0; i < AllPoints.Count; i++)
+        for (int i = 0; i < hitcount + 4; i++)
         {
-            var delta = (Vector3)AllPoints[i] - transform.position;
+            var delta = (Vector3)_allPoints[i] - transform.position;
             float angle = Mathf.Atan2(delta.y, delta.x);
-            Angles[angleIndex++] = (angle - 0.001f);
-            Angles[angleIndex++] = (angle);
-            Angles[angleIndex++] = (angle + 0.001f);
+            _angles[angleIndex++] = (angle - 0.001f);
+            _angles[angleIndex++] = (angle);
+            _angles[angleIndex++] = (angle + 0.001f);
         }
 
-        pointAndAngles.Clear();
-
         var origPos = transform.position;
-        for (int i = 0; i < Angles.Length; i++)
+        for (int i = 0; i < hitcount * 3 + 12; i++)
         {
             // Custom raycasting
-            var raydeltax = radius * Mathf.Cos(Angles[i]);
-            var raydeltay = radius * Mathf.Sin(Angles[i]);
+            var raydeltax = Mathf.Cos(_angles[i]);
+            var raydeltay = Mathf.Sin(_angles[i]);
             var min_t1 = float.MaxValue;
             Vector2 minIntersect = new Vector2();
             var found = false;
             // Check the ray against all segments within view. 
             // This could most likely be optimized using a quadtree
-            for (int j = 0; j < Segments.Length; j++)
+            for (int j = 0; j < _segments.Length; j++)
             {
-                var seg = Segments[j];
+                var seg = _segments[j];
                 var segmentDelta = seg.b - seg.a;
 
                 // check if the lines are parrallel or coincident
@@ -99,7 +102,9 @@ public class Controller : MonoBehaviour
                 }
 
                 // parametric equation if a ray and a line intersects
-                var t2 = (raydeltax * (seg.a.y - origPos.y) + (raydeltay * (origPos.x - seg.a.x))) / (segmentDelta.x * raydeltay - segmentDelta.y * raydeltax);
+                var t2 = 
+                        (raydeltax * (seg.a.y - origPos.y) + (raydeltay * (origPos.x - seg.a.x))) / 
+                        (segmentDelta.x * raydeltay - segmentDelta.y * raydeltax);
                 var t1 = (seg.a.x + segmentDelta.x * t2 - origPos.x) / raydeltax;
                 // if t1 is less than 0, the ray is pointing in the wrong direction.
                 // if t2 is not within 0 & 1 we have no intersection. hence we can continue.
@@ -121,11 +126,11 @@ public class Controller : MonoBehaviour
             }
             if (found)
             {
-                pointAndAngles.Add(new PointAndAngle() { Point = minIntersect, angle = Angles[i] });
+                _pointAndAngles.Add(new PointAndAngle(minIntersect, _angles[i]));
             }
             else
             {
-                pointAndAngles.Add(new PointAndAngle() { Point = new Vector3(raydeltax, raydeltay) });
+                _pointAndAngles.Add(new PointAndAngle(new Vector3(raydeltax, raydeltay)));
             }
         }
 
@@ -150,21 +155,29 @@ public class Controller : MonoBehaviour
         {
             transform.position += Vector3.right * -speed * Time.deltaTime;
         }
+        if (Input.GetKey(KeyCode.E))
+        {
+            transform.rotation *= Quaternion.Euler(new Vector3(0, 0, -speed * 5 * Time.deltaTime));
+        }
+        if (Input.GetKey(KeyCode.Q))
+        {
+            transform.rotation *= Quaternion.Euler(new Vector3(0, 0, speed * 5 * Time.deltaTime));
+        }
     }
 
     private void GenerateMesh()
     {
-        pointAndAngles.Sort();
+        _pointAndAngles.Sort();
         //MESH GENERATION
-        Vector3[] vertices = new Vector3[pointAndAngles.Count * 2 + 1];
+        Vector3[] vertices = new Vector3[_pointAndAngles.Count * 2 + 1];
         int[] triangles = new int[vertices.Length * 3];
         Vector2[] uvs = new Vector2[vertices.Length];
         vertices[0] = (transform.InverseTransformPoint(transform.position)); // Wonder if conversion is needed
 
-        for (int i = 1; i <= pointAndAngles.Count; i++)
+        for (int i = 1; i <= _pointAndAngles.Count; i++)
         {
-            vertices[i] = transform.InverseTransformPoint(pointAndAngles[i - 1].Point);
-            vertices[i + 1] = transform.InverseTransformPoint(pointAndAngles[(i) % pointAndAngles.Count].Point);
+            vertices[i] = transform.InverseTransformPoint(_pointAndAngles[i - 1].Point);
+            vertices[i + 1] = transform.InverseTransformPoint(_pointAndAngles[(i) % _pointAndAngles.Count].Point);
         }
 
         int triangleIndex = 0;
@@ -187,26 +200,26 @@ public class Controller : MonoBehaviour
         mesh.RecalculateBounds();
         mesh.RecalculateNormals();
 
-        MeshFilter.mesh = mesh;
+        _meshFilter.mesh = mesh;
     }
 
 
-    public Segment[] FindAllLines(List<BoxCollider2D> staticColliders)
+    public void PopulateAllSegmentsAndPoints(Collider2D[] colliders, int hitCount)
     {
-        AllPoints.Clear();
-        List<Segment> segments = new List<Segment>();
-        foreach (var collider in staticColliders)
+        for (int i = 0; i < hitCount; i++)
         {
-            CalculateBoxColliderSegments(segments, collider);
+            var collider = colliders[i];
+            CalculateBoxColliderSegmentsAndPoints(collider, i * 4);
         }
 
-        CalculateBoxColliderSegments(segments, VisionBounds);
-
-
-        return segments.ToArray();
+        if (hitCount == 0)
+        {
+            CalculateBoxColliderSegmentsAndPoints(VisionBounds, 4);
+        }
+        CalculateBoxColliderSegmentsAndPoints(VisionBounds, hitCount * 4);
     }
 
-    private void CalculateBoxColliderSegments(List<Segment> existingSegments, BoxCollider2D collider)
+    private void CalculateBoxColliderSegmentsAndPoints(Collider2D collider, int index)
     {
         var center = collider.bounds.center;
         var extents = collider.bounds.extents;
@@ -216,26 +229,31 @@ public class Controller : MonoBehaviour
         var southWest = center + new Vector3(-extents.x, -extents.y);
         var northWest = center + new Vector3(-extents.x, extents.y);
 
-        existingSegments.Add(new Segment { a = northEast, b = southEast });
-        existingSegments.Add(new Segment { a = southEast, b = southWest });
-        existingSegments.Add(new Segment { a = southWest, b = northWest });
-        existingSegments.Add(new Segment { a = northWest, b = northEast });
+        _segments[index] = new Segment(northEast, southEast);
+        _segments[index + 1] = (new Segment(southEast, southWest));
+        _segments[index + 2] = (new Segment(southWest, northWest));
+        _segments[index + 3] = (new Segment(northWest, northEast));
 
-        AllPoints.Add(northEast);
-        AllPoints.Add(southEast);
-        AllPoints.Add(southWest);
-        AllPoints.Add(northWest);
+        _allPoints[index] = northEast;
+        _allPoints[index + 1] = southEast;
+        _allPoints[index + 2] = southWest;
+        _allPoints[index + 3] = northWest;
     }
 
-    public struct Segment
+    public readonly struct Segment
     {
-        public Vector2 a;
-        public Vector2 b;
+        public Segment(Vector2 a, Vector2 b)
+        {
+            this.a = a;
+            this.b = b;
+        }
+        public readonly Vector2 a;
+        public readonly Vector2 b;
     }
 
-    struct ColliderVertices
+    readonly struct ColliderVertices
     {
-        public Vector3[] Vertices;
+        public readonly Vector3[] Vertices;
 
         public ColliderVertices(BoxCollider2D collider)
         {
@@ -251,21 +269,27 @@ public class Controller : MonoBehaviour
         public ColliderVertices(Camera cam)
         {
 
-            var vert = cam.orthographicSize;//Camera.main.orthographicSize;
+            var vert = cam.orthographicSize;
             var horz = vert * Screen.width / Screen.height;
             var camPos = Camera.main.transform.position;
             Vertices = new Vector3[4];
-            Vertices[0] =  new Vector3(camPos.x + vert, camPos.y + horz, 0);
+            Vertices[0] = new Vector3(camPos.x + vert, camPos.y + horz, 0);
             Vertices[1] = new Vector3(camPos.x + vert, camPos.y - horz, 0);
             Vertices[2] = new Vector3(camPos.x - vert, camPos.y - horz, 0);
             Vertices[3] = new Vector3(camPos.x - vert, camPos.y + horz, 0);
         }
     }
 
-    struct PointAndAngle : IComparable<PointAndAngle>
+    readonly struct PointAndAngle : IComparable<PointAndAngle>
     {
-        public float angle;
-        public Vector3 Point;
+        public readonly float angle;
+        public readonly Vector3 Point;
+
+        public PointAndAngle(Vector3 point, float angle = 0)
+        {
+            this.angle = angle;
+            Point = point;
+        }
 
         public int CompareTo(PointAndAngle other)
         {
@@ -273,10 +297,10 @@ public class Controller : MonoBehaviour
         }
     }
 
-    struct DirectionAndAngle : IComparable<DirectionAndAngle>
+    readonly struct DirectionAndAngle : IComparable<DirectionAndAngle>
     {
-        public float angle;
-        public Vector3 direction;
+        public readonly float angle;
+        public readonly Vector3 direction;
         public DirectionAndAngle(Vector3 from, Vector3 to)
         {
             direction = to - from;
