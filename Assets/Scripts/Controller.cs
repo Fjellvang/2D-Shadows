@@ -10,7 +10,8 @@ using UnityEngine;
 /// </summary>
 public class Controller : MonoBehaviour
 {
-    Transform transform;
+    public BoxCollider2D VisionBounds;
+
     [SerializeField]
     float speed = 10;
     public float radius = 5f;
@@ -21,30 +22,28 @@ public class Controller : MonoBehaviour
     MeshRenderer renderer;
 
 
-    ColliderVertices[] colliderVertices;
     Segment[] Segments;
-    Vector2[] AllPoints;
+    List<Vector2> AllPoints = new List<Vector2>();
+
     float[] Angles;
     MeshFilter MeshFilter;
     List<PointAndAngle> pointAndAngles = new List<PointAndAngle>();//TODO: Don't new up here
+    List<BoxCollider2D> _staticBoxColliders;
     // Start is called before the first frame update
     void Start()
     {
-        transform = GetComponent<Transform>();
-        Segments = FindAllLines();
-        //TODO: Optimize this;
-        var points = new List<Vector2>();
-        foreach (var item in Segments)
-        {
-            points.Add(item.a);
-            points.Add(item.b);
-        }
-        AllPoints = points.Distinct().ToArray();
-        Angles = new float[AllPoints.Length*3];
+        _staticBoxColliders = GameObject.FindGameObjectsWithTag("wall").Select(x => x.GetComponent<BoxCollider2D>()).ToList();
+        CalculatePointsAndAngles(_staticBoxColliders);
     }
+
+    private void CalculatePointsAndAngles(List<BoxCollider2D> staticColliders)
+    {
+        Segments = FindAllLines(staticColliders);
+        Angles = new float[AllPoints.Count * 3];
+    }
+
     private void Awake()
     {
-        FindAllWalls();
         MeshFilter = GetComponentInChildren<MeshFilter>();
         renderer = GetComponentInChildren<MeshRenderer>();
         renderer.material = mat;
@@ -58,16 +57,15 @@ public class Controller : MonoBehaviour
         }
     }
 
-    List<float> angles = new List<float>(); //TODO: FIND BETTER;
     // Update is called once per frame
     void Update()
     {
-        colliderVertices[colliderVertices.Length - 1] = new ColliderVertices(Camera.main);
+        CalculatePointsAndAngles(_staticBoxColliders);
 
         Movement();
 
         int angleIndex = 0;
-        for (int i = 0; i < AllPoints.Length; i++)
+        for (int i = 0; i < AllPoints.Count; i++)
         {
             var delta = (Vector3)AllPoints[i] - transform.position;
             float angle = Mathf.Atan2(delta.y, delta.x);
@@ -81,27 +79,37 @@ public class Controller : MonoBehaviour
         var origPos = transform.position;
         for (int i = 0; i < Angles.Length; i++)
         {
+            // Custom raycasting
             var raydeltax = radius * Mathf.Cos(Angles[i]);
             var raydeltay = radius * Mathf.Sin(Angles[i]);
             var min_t1 = float.MaxValue;
             Vector2 minIntersect = new Vector2();
             var found = false;
+            // Check the ray against all segments within view. 
+            // This could most likely be optimized using a quadtree
             for (int j = 0; j < Segments.Length; j++)
             {
-                var segmentDelta = Segments[j].b - Segments[j].a;
+                var seg = Segments[j];
+                var segmentDelta = seg.b - seg.a;
+
+                // check if the lines are parrallel or coincident
                 if (Mathf.Abs(segmentDelta.x - raydeltax) <= 0 || Mathf.Abs(segmentDelta.y - raydeltay) <= 0)
                 {
                     continue;
                 }
 
-                var seg = Segments[j];
+                // parametric equation if a ray and a line intersects
                 var t2 = (raydeltax * (seg.a.y - origPos.y) + (raydeltay * (origPos.x - seg.a.x))) / (segmentDelta.x * raydeltay - segmentDelta.y * raydeltax);
                 var t1 = (seg.a.x + segmentDelta.x * t2 - origPos.x) / raydeltax;
+                // if t1 is less than 0, the ray is pointing in the wrong direction.
+                // if t2 is not within 0 & 1 we have no intersection. hence we can continue.
                 if (t1 <= 0 || t2 < 0 || t2 > 1.0f)
                 {
                     continue;
                 }
 
+                // if the newly found intersection is less than the previous one, update our min intersection.
+                // IE we want to find the point closets to the rays origin.
                 if (t1 < min_t1)
                 {
                     min_t1 = t1;
@@ -149,7 +157,8 @@ public class Controller : MonoBehaviour
         pointAndAngles.Sort();
         //MESH GENERATION
         Vector3[] vertices = new Vector3[pointAndAngles.Count * 2 + 1];
-        int[] triangles = new int[vertices.Length * 3 + 3];
+        int[] triangles = new int[vertices.Length * 3];
+        Vector2[] uvs = new Vector2[vertices.Length];
         vertices[0] = (transform.InverseTransformPoint(transform.position)); // Wonder if conversion is needed
 
         for (int i = 1; i <= pointAndAngles.Count; i++)
@@ -159,11 +168,13 @@ public class Controller : MonoBehaviour
         }
 
         int triangleIndex = 0;
-        for (int i = 0; i < vertices.Length + 1; i++)
+        for (int i = 0; i < vertices.Length ; i++)
         {
             triangles[triangleIndex++] = (i + 1) % vertices.Length;
             triangles[triangleIndex++] = i % vertices.Length;
             triangles[triangleIndex++] = 0;
+            // the + 5 is hald the bounds size, the / 10 is the bounds size
+            uvs[i] = new Vector2((vertices[i].x+5)/10, (vertices[i].y+5)/10);
         }
 
 
@@ -171,6 +182,7 @@ public class Controller : MonoBehaviour
         {
             vertices = vertices,
             triangles = triangles,
+            uv = uvs
         };
         mesh.RecalculateBounds();
         mesh.RecalculateNormals();
@@ -178,47 +190,43 @@ public class Controller : MonoBehaviour
         MeshFilter.mesh = mesh;
     }
 
-    public void FindAllWalls()
+
+    public Segment[] FindAllLines(List<BoxCollider2D> staticColliders)
     {
-        var retval = GameObject.FindGameObjectsWithTag("wall")
-            .Select(x => new ColliderVertices(x.GetComponent<BoxCollider2D>()))
-            .ToList();
-        //TODO THIS SHIT IS DYNAMIC, CHANGE IT.
-        retval.Add(new ColliderVertices(Camera.main));
-        colliderVertices = retval.ToArray();
+        AllPoints.Clear();
+        List<Segment> segments = new List<Segment>();
+        foreach (var collider in staticColliders)
+        {
+            CalculateBoxColliderSegments(segments, collider);
+        }
+
+        CalculateBoxColliderSegments(segments, VisionBounds);
+
+
+        return segments.ToArray();
     }
 
-    public Segment[] FindAllLines()
+    private void CalculateBoxColliderSegments(List<Segment> existingSegments, BoxCollider2D collider)
     {
-        var allwalls = GameObject.FindGameObjectsWithTag("wall").Select(x=> x.GetComponent<BoxCollider2D>()).ToArray();
-        List<Segment> retval = new List<Segment>();
-        foreach (var collider in allwalls)
-        {
-            var center = collider.bounds.center;
-            var extents = collider.bounds.extents;
-            var NorthEast = center + extents;
-            var SouthEast = center + new Vector3(extents.x, -extents.y);
-            var SouthWest = center + new Vector3(-extents.x, -extents.y);
-            var NorthWest = center + new Vector3(-extents.x, extents.y);
-            retval.Add(new Segment { a = NorthEast, b = SouthEast });
-            retval.Add(new Segment { a = SouthEast, b = SouthWest });
-            retval.Add( new Segment { a = SouthWest, b = NorthWest });
-            retval.Add( new Segment { a = NorthWest, b = NorthEast });
-        }
-        var cam = Camera.main;
-        var vert = cam.orthographicSize;//Camera.main.orthographicSize;
-        var horz = vert * Screen.width / Screen.height;
-        var camPos = Camera.main.transform.position;
-        var northeast =  new Vector3(camPos.x + vert, camPos.y + horz, 0);
-        var southeast = new Vector3(camPos.x + vert, camPos.y - horz, 0);
-        var southwest = new Vector3(camPos.x - vert, camPos.y - horz, 0);
-        var northwest = new Vector3(camPos.x - vert, camPos.y + horz, 0);
-        retval.Add(new Segment { a = northeast, b = southeast });
-        retval.Add( new Segment { a = southeast, b = southwest });
-        retval.Add( new Segment { a = southwest, b = northwest });
-        retval.Add( new Segment { a = northwest, b = northeast });
-        return retval.ToArray();
+        var center = collider.bounds.center;
+        var extents = collider.bounds.extents;
+
+        var northEast = center + extents;
+        var southEast = center + new Vector3(extents.x, -extents.y);
+        var southWest = center + new Vector3(-extents.x, -extents.y);
+        var northWest = center + new Vector3(-extents.x, extents.y);
+
+        existingSegments.Add(new Segment { a = northEast, b = southEast });
+        existingSegments.Add(new Segment { a = southEast, b = southWest });
+        existingSegments.Add(new Segment { a = southWest, b = northWest });
+        existingSegments.Add(new Segment { a = northWest, b = northEast });
+
+        AllPoints.Add(northEast);
+        AllPoints.Add(southEast);
+        AllPoints.Add(southWest);
+        AllPoints.Add(northWest);
     }
+
     public struct Segment
     {
         public Vector2 a;
