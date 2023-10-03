@@ -159,9 +159,12 @@ MonoBehaviour:
   _speed: 10
   radius: 5
   mask:
-    serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 512
   mat: {fileID: 2100000, guid: 4a4aff15f1f088c429dae04f330b17dc, type: 2}
+  _renderer: {fileID: 0}
+  _allPoints: []
+  _angles: []
+  _meshFilter: {fileID: 0}
 --- !u!61 &15231769
 BoxCollider2D:
   m_ObjectHideFlags: 0

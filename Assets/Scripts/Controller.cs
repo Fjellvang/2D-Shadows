@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 /// <summary>
 /// Inspired from https://github.com/OneLoneCoder/olcPixelGameEngine/blob/master/OneLoneCoder_PGE_ShadowCasting2D.cpp
@@ -10,7 +8,7 @@ using UnityEngine;
 /// </summary>
 public class Controller : MonoBehaviour
 {
-    public BoxCollider2D VisionBounds;
+    public Vector3 VisionBoundsExtends = new Vector3(5, 5);
 
     [SerializeField]
     float _speed = 10;
@@ -28,12 +26,6 @@ public class Controller : MonoBehaviour
     float[] _angles;
     MeshFilter _meshFilter;
     List<PointAndAngle> _pointAndAngles = new List<PointAndAngle>();
-    // Start is called before the first frame update
-    void Start()
-    {
-        //_staticBoxColliders = GameObject.FindGameObjectsWithTag("wall").Select(x => x.GetComponent<BoxCollider2D>()).ToList();
-        //CalculatePointsAndAngles(_staticBoxColliders);
-    }
 
     private void CalculatePointsAndAngles(Collider2D[] staticColliders)
     {
@@ -52,6 +44,7 @@ public class Controller : MonoBehaviour
     {
         foreach (var item in _pointAndAngles)
         {
+
             Gizmos.DrawSphere(item.Point, 0.2f);
         }
     }
@@ -59,7 +52,7 @@ public class Controller : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        var colliders = Physics2D.OverlapBoxAll(transform.position, VisionBounds.bounds.size, 360, mask);
+        var colliders = Physics2D.OverlapBoxAll(transform.position, VisionBoundsExtends, 360, mask);
         CalculatePointsAndAngles(colliders);
 
         Movement();
@@ -197,20 +190,17 @@ public class Controller : MonoBehaviour
         List<Segment> segments = new List<Segment>();
         foreach (var collider in staticColliders)
         {
-            CalculateBoxColliderSegments(segments, collider);
+            CalculateBoxColliderSegments(segments, collider.bounds.center, collider.bounds.extents);
         }
 
-        CalculateBoxColliderSegments(segments, VisionBounds);
+        CalculateBoxColliderSegments(segments, transform.position, VisionBoundsExtends);
 
 
         return segments.ToArray();
     }
 
-    private void CalculateBoxColliderSegments(List<Segment> existingSegments, Collider2D collider)
+    private void CalculateBoxColliderSegments(List<Segment> existingSegments, Vector3 center, Vector3 extents)
     {
-        var center = collider.bounds.center;
-        var extents = collider.bounds.extents;
-
         var northEast = center + extents;
         var southEast = center + new Vector3(extents.x, -extents.y);
         var southWest = center + new Vector3(-extents.x, -extents.y);
